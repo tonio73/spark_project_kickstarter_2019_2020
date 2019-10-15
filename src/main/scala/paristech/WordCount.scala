@@ -1,8 +1,9 @@
 package paristech
 
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.functions.{sum, lower, split, explode}
+import org.apache.spark.sql.functions.{explode, lower, split, sum}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object WordCount {
@@ -26,10 +27,14 @@ object WordCount {
       "spark.sql.shuffle.partitions" -> "12"
     ))
 
+    Logger.getLogger("org").setLevel(Level.WARN)
+    Logger.getLogger("akka").setLevel(Level.WARN)
+
     // création du SparkSession, la base de tout programme Spark
     val spark = SparkSession
       .builder
       .config(conf)
+      .master("local[*]")
       .appName("TP Spark : Word Count")
       .getOrCreate()
 
@@ -41,7 +46,7 @@ object WordCount {
       */
 
     // utilisez votre path
-    val filepath: String = "/Users/flo/Documents/packages/spark-2.3.4-bin-hadoop2.7/README.md"
+    val filepath: String = "/Users/antoinehue/Code/data-science-private/Cours/INF729-Hadoop-Spark_TP/spark_project_kickstarter_2019_2020/LiCENSE"
 
     val rdd: RDD[String] = sc.textFile(filepath)
 

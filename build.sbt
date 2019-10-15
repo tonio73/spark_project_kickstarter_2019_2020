@@ -1,18 +1,22 @@
-name := "spark_project_kickstarter_2019_2020"
+lazy val root = (project in file(".")).
+  settings(
+    name := "spark_project_kickstarter_2019_2020",
 
-version := "1.0"
+    version := "1.0",
 
-organization := "paristech"
+    organization := "paristech",
 
-scalaVersion := "2.11.11"
+    scalaVersion := "2.11.11"
+  )
 
-val sparkVersion = "2.3.4"
+val sparkVersion = "2.4.0"
+val HadoopVersion = "2.7.2"
 
 libraryDependencies ++= Seq(
-  // Spark dependencies. Marked as provided because they must not be included in the uber jar
-  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
+  // Spark dependencies. NEEDED for local master. WAS: Marked as provided because they must not be included in the uber jar
+  "org.apache.spark" %% "spark-core" % sparkVersion, // % "provided",
+  "org.apache.spark" %% "spark-sql" % sparkVersion, // % "provided",
+  "org.apache.spark" %% "spark-mllib" % sparkVersion, // % "provided",
 
   // Third-party libraries
   "org.apache.hadoop" % "hadoop-aws" % "2.6.0" % "provided",
