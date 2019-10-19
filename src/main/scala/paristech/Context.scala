@@ -20,7 +20,8 @@ object Context {
       "spark.shuffle.file.buffer" -> "32k",
       "spark.default.parallelism" -> "12",
       "spark.sql.shuffle.partitions" -> "12",
-      "spark.driver.maxResultSize" -> "2g"
+      "spark.driver.maxResultSize" -> "2g",
+      "spark.driver-memory" ->  "10g"
     ))
 
     Logger.getLogger("org").setLevel(Level.WARN)

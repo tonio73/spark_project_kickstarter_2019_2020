@@ -1,10 +1,8 @@
 package paristech
 
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{explode, lower, split, sum}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object WordCount {
 
@@ -15,29 +13,8 @@ object WordCount {
   // fonction main <=> fonction qui sera exécutée par Spark
   def main(args: Array[String]): Unit = {
 
-    // la conf qui sera utilisée par Spark lorsqu'on exécutera cette fonction
-    val conf = new SparkConf().setAll(Map(
-      "spark.scheduler.mode" -> "FIFO",
-      "spark.speculation" -> "false",
-      "spark.reducer.maxSizeInFlight" -> "48m",
-      "spark.serializer" -> "org.apache.spark.serializer.KryoSerializer",
-      "spark.kryoserializer.buffer.max" -> "1g",
-      "spark.shuffle.file.buffer" -> "32k",
-      "spark.default.parallelism" -> "12",
-      "spark.sql.shuffle.partitions" -> "12"
-    ))
-
-    Logger.getLogger("org").setLevel(Level.WARN)
-    Logger.getLogger("akka").setLevel(Level.WARN)
-
     // création du SparkSession, la base de tout programme Spark
-    val spark = SparkSession
-      .builder
-      .config(conf)
-      .master("local[*]")
-      .appName("TP Spark : Word Count")
-      .getOrCreate()
-
+    val spark = Context.createSession()
     // on récupère le SparkContext à partir du SparkSession
     val sc = spark.sparkContext
 
