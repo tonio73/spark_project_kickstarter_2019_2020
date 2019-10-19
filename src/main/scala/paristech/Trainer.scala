@@ -1,8 +1,7 @@
 package paristech
 
-import org.apache.spark.sql.{DataFrame}
-import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, StopWordsRemover, StringIndexer,
-  OneHotEncoderEstimator, VectorAssembler}
+import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.ml.feature.{HashingTF, IDF, OneHotEncoderEstimator, RegexTokenizer, StopWordsRemover, StringIndexer, VectorAssembler}
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.Pipeline
 // import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
@@ -30,10 +29,12 @@ object Trainer {
     val idf = new IDF().setInputCol("textTf").setOutputCol("tfidf")
 
     val countryIndexer = new StringIndexer()
+      .setHandleInvalid("keep") // To handle labels that are not in training but are in test
       .setInputCol("country2")
       .setOutputCol("country_indexed")
 
     val currencyIndexer = new StringIndexer()
+      .setHandleInvalid("keep") // To handle labels that are not in training but are in test
       .setInputCol("currency2")
       .setOutputCol("currency_indexed")
 
@@ -68,10 +69,13 @@ object Trainer {
     val spark = Context.createSession()
 
     // Read data
-    val df: DataFrame = spark.read.parquet(Context.dataPath + "prepared_trainingset")
+    val df: DataFrame = spark.read.parquet(Context.dataPath + "/prepared_trainingset")
 
     // Split train / test
-    val Array(dfTrain, dfTest) = df.randomSplit(Array(0.9, 0.1), seed = Context.splitterSeed)
+    val Array(dfTrain, dfTest) = df.randomSplit(Array(0.9, 0.1))
+
+    // Save test data
+    dfTest.write.mode(SaveMode.Overwrite).parquet(Context.dataPath + "/test/test_df")
 
     // Make pipeline
     val pipeline = buildPipeline()

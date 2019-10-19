@@ -11,10 +11,7 @@ object Tester {
     val spark = Context.createSession()
 
     // Read data
-    val df: DataFrame = spark.read.parquet(Context.dataPath + "prepared_trainingset")
-
-    // Split train / test
-    val Array(dfTrain, dfTest) = df.randomSplit(Array(0.9, 0.1), seed = Context.splitterSeed)
+    val dfTest: DataFrame = spark.read.parquet(Context.dataPath + "/test/test_df")
 
     // And load it back in during production
     val savedModel = PipelineModel.load(Context.dataPath + "/models/spark-logistic-regression-model")

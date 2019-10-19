@@ -9,9 +9,6 @@ object Context {
   // Path to data, assuming that the cours-spark-telecom is side by side with the project
   val dataPath = System.getProperty("user.dir") + "/../cours-spark-telecom/data/"
 
-  // Train / test splitter seed
-  val splitterSeed = 20568
-
   // Create and config a Spark session
   def createSession(): SparkSession = {
     val conf = new SparkConf().setAll(Map(
