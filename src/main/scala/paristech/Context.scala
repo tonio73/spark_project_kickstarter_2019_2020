@@ -30,7 +30,7 @@ object Context {
     val sparkSession = SparkSession
       .builder
       .config(conf)
-      .master("local[4]")
+      .master("local[6]")
       .appName("TP Spark : Trainer")
       .getOrCreate()
 

@@ -1,19 +1,21 @@
 package paristech
 
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-import org.apache.spark.ml.feature.{HashingTF, IDF, OneHotEncoderEstimator, RegexTokenizer, StopWordsRemover, StringIndexer, VectorAssembler}
+import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
-import org.apache.spark.ml.{Pipeline, PipelineModel}
-// import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit}
+import org.apache.spark.ml.feature._
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.{CrossValidator, CrossValidatorModel, ParamGridBuilder}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object Trainer {
 
   // Make pipeline (word TFIDF, categories, label encoders) + logistic regression
-  def buildPipeline(): Pipeline = {
+  // Also creating the grid search on the min term frequency (minDF) and the regularization parameter
+  def buildPipeline(): (Pipeline, Array[ParamMap]) = {
 
     // Handling of the texts :
-    // 1. tokenization
+    // 1. tokenize
     // 2. remove stop words
     // 3. compute TF-IDF
     val tokenizer = new RegexTokenizer()
@@ -21,6 +23,7 @@ object Trainer {
       .setGaps(true)
       .setInputCol("text")
       .setOutputCol("tokens")
+
 
     val stopWordRemover = new StopWordsRemover()
       .setCaseSensitive(false)
@@ -66,12 +69,21 @@ object Trainer {
       .setRawPredictionCol("raw_predictions")
       .setThresholds(Array(0.7, 0.3))
       .setTol(1.0e-6)
-      .setRegParam(0.001)
-      .setMaxIter(30)
+      .setRegParam(0.0001)
+      .setMaxIter(20)
 
-    new Pipeline()
+    val pipeline = new  Pipeline()
       .setStages(Array(tokenizer, stopWordRemover, hashingTF, idf, countryIndexer,
         currencyIndexer, oneHotEncoder, assembler, lr))
+
+    // Grid search parameters
+    // this grid will have 3 x 4 = 12 parameter settings for CrossValidator to choose from.
+    val paramGrid = new ParamGridBuilder()
+      .addGrid(idf.minDocFreq, Array(55, 75, 95))
+      .addGrid(lr.regParam, Array(1e-8, 1e-6, 1e-4, 1e-2))
+      .build()
+
+    return (pipeline, paramGrid)
   }
 
   // Split cleaned data
@@ -92,17 +104,31 @@ object Trainer {
   }
 
   // Train
-  def fitModel(dfTrain: DataFrame, saveModels: Boolean): PipelineModel = {
+  def fitModel(dfTrain: DataFrame, saveModels: Boolean): CrossValidatorModel = {
+
     // Make pipeline
-    val pipeline = buildPipeline()
+    val (pipeline, gridParams) = buildPipeline()
 
     // Save unfit pipeline to disk
     if (saveModels) {
       pipeline.write.overwrite().save(Context.dataPath + "/model0-unfit")
     }
 
+    // Evaluation of the model based on F1-score
+    val evaluator = new MulticlassClassificationEvaluator()
+      .setLabelCol("final_status")
+      .setPredictionCol("predictions")
+      .setMetricName("f1")
+
+    val cv = new CrossValidator()
+      .setEstimator(pipeline)
+      .setEstimatorParamMaps(gridParams)
+      .setEvaluator(evaluator)
+      .setNumFolds(3)  // Approx 70/30
+      .setParallelism(2)  // Evaluate up to 2 parameter settings in parallel
+
     // Fit the pipeline to training documents.
-    val model = pipeline.fit(dfTrain)
+    val model: CrossValidatorModel = cv.fit(dfTrain)
 
     // Save the fitted pipeline to disk
     if (saveModels) {
@@ -113,7 +139,7 @@ object Trainer {
   }
 
   // Perform predictions and compute F1-score
-  def test(model: PipelineModel, dfTest: DataFrame): Unit = {
+  def test(model: CrossValidatorModel, dfTest: DataFrame): Unit = {
 
     // Compute predictions
     val dfWithSimplePredictions = model.transform(dfTest)
@@ -142,24 +168,24 @@ object Trainer {
     if (args.length > 0) {
       args(0) match {
         case "--train" => {
-          val Array(dfTrain, dfTest) = splitData(spark, true)
-          fitModel(dfTrain, true)
+          val Array(dfTrain, dfTest) = splitData(spark, saveTestData = true)
+          fitModel(dfTrain, saveModels = true)
         }
         case "--test" => {
           // Read data
           val dfTest: DataFrame = spark.read.parquet(Context.dataPath + "/test/test_df")
 
           // And load it back in during production
-          val model = PipelineModel.load(Context.dataPath + "/models/spark-logistic-regression-model")
+          val model = CrossValidatorModel.load(Context.dataPath + "/models/spark-logistic-regression-model")
 
           test(model, dfTest)
         }
         case _ => {
           // Default : do Train and Test
-          val Array(dfTrain, dfTest) = splitData(spark, false)
+          val Array(dfTrain, dfTest) = splitData(spark, saveTestData = false)
 
           print("\n=== Starting Model fitting ===\n\n")
-          val model = fitModel(dfTrain, false)
+          val model = fitModel(dfTrain, saveModels = false)
           print("\n=== Starting Model testing ===\n\n")
           test(model, dfTest)
         }
@@ -167,10 +193,10 @@ object Trainer {
     }
     else {
       // Default : do Train and Test
-      val Array(dfTrain, dfTest) = splitData(spark, false)
+      val Array(dfTrain, dfTest) = splitData(spark, saveTestData = false)
 
       print("\n=== Starting Model fitting ===\n\n")
-      val model = fitModel(dfTrain, false)
+      val model = fitModel(dfTrain, saveModels = false)
       print("\n=== Starting Model testing ===\n\n")
       test(model, dfTest)
     }
