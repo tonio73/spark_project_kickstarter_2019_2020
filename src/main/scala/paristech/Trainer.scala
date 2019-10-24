@@ -10,9 +10,9 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object Trainer {
 
-  // Make pipeline (word TFIDF, categories, label encoders) + logistic regression
+  // Make pipeline (word TF-IDF, categories, label encoders) + logistic regression
   // Also creating the grid search on the min term frequency (minDF) and the regularization parameter
-  def buildPipeline(): (Pipeline, Array[ParamMap]) = {
+  def buildPipeline(gridSearch: Boolean): (Pipeline, Array[ParamMap]) = {
 
     // Handling of the texts :
     // 1. tokenize
@@ -77,13 +77,19 @@ object Trainer {
         currencyIndexer, oneHotEncoder, assembler, lr))
 
     // Grid search parameters
-    // this grid will have 3 x 4 = 12 parameter settings for CrossValidator to choose from.
     val paramGrid = new ParamGridBuilder()
-      .addGrid(idf.minDocFreq, Array(55, 75, 95))
-      .addGrid(lr.regParam, Array(1e-8, 1e-6, 1e-4, 1e-2))
-      .build()
+    // this grid will have 3 x 4 = 12 parameter settings for CrossValidator to choose from.
+    if (gridSearch) {
+      paramGrid
+        .addGrid(idf.minDocFreq, Array(55, 75, 95))
+        .addGrid(lr.regParam, Array(1e-8, 1e-6, 1e-4, 1e-2))
+    }
+    else {
+      paramGrid
+        .addGrid(idf.minDocFreq, Array(0))
+    }
 
-    return (pipeline, paramGrid)
+    return (pipeline, paramGrid.build())
   }
 
   // Split cleaned data
@@ -104,10 +110,10 @@ object Trainer {
   }
 
   // Train
-  def fitModel(dfTrain: DataFrame, saveModels: Boolean): CrossValidatorModel = {
+  def fitModel(dfTrain: DataFrame, saveModels: Boolean, gridSearch: Boolean): CrossValidatorModel = {
 
     // Make pipeline
-    val (pipeline, gridParams) = buildPipeline()
+    val (pipeline, gridParams) = buildPipeline(gridSearch)
 
     // Save unfit pipeline to disk
     if (saveModels) {
@@ -163,42 +169,57 @@ object Trainer {
   // Tester : read model as saved,
   def main(args: Array[String]): Unit = {
 
+    object Command extends Enumeration {
+      type Command = Value
+      val DEFAULT, TRAIN, TEST = Value
+    }
+
+    var command = Command.DEFAULT
+    var gridSearch = true
+
     val spark = Context.createSession()
 
-    if (args.length > 0) {
-      args(0) match {
-        case "--train" => {
-          val Array(dfTrain, dfTest) = splitData(spark, saveTestData = true)
-          fitModel(dfTrain, saveModels = true)
-        }
-        case "--test" => {
-          // Read data
-          val dfTest: DataFrame = spark.read.parquet(Context.dataPath + "/test/test_df")
+    // Command line args
+    args.foreach( arg => {
+      arg match {
+        case "--train" => command = Command.TRAIN
 
-          // And load it back in during production
-          val model = CrossValidatorModel.load(Context.dataPath + "/models/spark-logistic-regression-model")
+        case "--test" => command = Command.TEST
 
-          test(model, dfTest)
-        }
+        case "--single-run" => gridSearch = false
+
         case _ => {
-          // Default : do Train and Test
-          val Array(dfTrain, dfTest) = splitData(spark, saveTestData = false)
-
-          print("\n=== Starting Model fitting ===\n\n")
-          val model = fitModel(dfTrain, saveModels = false)
-          print("\n=== Starting Model testing ===\n\n")
-          test(model, dfTest)
+            print("Usage: --train|--test --single-run")
         }
       }
-    }
-    else {
-      // Default : do Train and Test
-      val Array(dfTrain, dfTest) = splitData(spark, saveTestData = false)
+    })
 
-      print("\n=== Starting Model fitting ===\n\n")
-      val model = fitModel(dfTrain, saveModels = false)
-      print("\n=== Starting Model testing ===\n\n")
-      test(model, dfTest)
+    command match {
+      case Command.TRAIN => {
+        val Array(dfTrain, dfTest) = splitData(spark, saveTestData = true)
+
+        print("\n=== Starting Model fitting ===\n\n")
+        fitModel(dfTrain, saveModels = true, gridSearch)
+      }
+      case Command.TEST => {
+        // Read data
+        val dfTest: DataFrame = spark.read.parquet(Context.dataPath + "/test/test_df")
+
+        // And load it back in during production
+        val model = CrossValidatorModel.load(Context.dataPath + "/models/spark-logistic-regression-model")
+
+        print("\n=== Starting Testing ===\n\n")
+        test(model, dfTest)
+      }
+      case _ => {
+        // Default : do Train and Test
+        val Array(dfTrain, dfTest) = splitData(spark, saveTestData = false)
+
+        print("\n=== Starting Model fitting ===\n\n")
+        val model = fitModel(dfTrain, saveModels = false, gridSearch)
+        print("\n=== Starting Model testing ===\n\n")
+        test(model, dfTest)
+      }
     }
   }
 }
