@@ -15,7 +15,8 @@ lazy val root = (project in file("."))
 lazy val sparkDependencies = Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion,
   "org.apache.spark" %% "spark-sql" % sparkVersion,
-  "org.apache.spark" %% "spark-mllib" % sparkVersion
+  "org.apache.spark" %% "spark-mllib" % sparkVersion,
+  "com.github.fommil.netlib" % "all" % "1.1.2"
 )
 
 // Other common dependencies

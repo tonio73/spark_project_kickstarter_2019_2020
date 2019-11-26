@@ -1,7 +1,7 @@
 package paristech
 
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{udf, lower, when}
+import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.functions.{concat_ws, lower, udf, when}
 
 object Preprocessor {
 
@@ -28,7 +28,7 @@ object Preprocessor {
       .read
       .option("header", true) // utilise la première ligne du (des) fichier(s) comme header
       .option("inferSchema", "true") // pour inférer le type de chaque colonne (Int, String, etc.)
-      .csv("./cours-spark-telecom/data/train_clean.csv")
+      .csv(Context.dataPath + "/train_clean.csv")
 
     println(s"Nombre de lignes : ${df.count}")
     println(s"Nombre de colonnes : ${df.columns.length}")
@@ -97,16 +97,15 @@ object Preprocessor {
       .withColumn("name", lower($"name"))
       .withColumn("desc", lower($"desc"))
       .withColumn("keywords", lower($"keywords"))
-      .withColumn("text", $"name" + " " + $"desc" + " " + $"keywords")
+      .withColumn("text", concat_ws(" ", $"name", $"desc", $"keywords"))
 
     val dfNoNull = dfTextNormed
-      .withColumn("days_campaign", when($"days_campaign".isNull, -1).otherwise($"days_campaign"))
       .withColumn("days_campaign", when($"days_campaign".isNull, -1).otherwise($"days_campaign"))
       .withColumn("hours_prepa", when($"hours_prepa".isNull, -1).otherwise($"hours_prepa"))
       .withColumn("country2", when($"country2".isNull, "unknown").otherwise($"country2"))
       .withColumn("currency2", when($"currency2".isNull, "unknown").otherwise($"currency2"))
 
     // Eventually write cleaned data to be used in the Trainer
-    dfNoNull.write.parquet(Context.dataPath + "/preprocessed")
+    dfNoNull.coalesce(1).write.mode(SaveMode.Overwrite).parquet(Context.outputPath + "/preprocessed")
   }
 }

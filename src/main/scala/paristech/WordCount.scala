@@ -23,7 +23,7 @@ object WordCount {
       */
 
     // utilisez votre path
-    val filepath: String = "/Users/antoinehue/Code/data-science-private/Cours/INF729-Hadoop-Spark_TP/spark_project_kickstarter_2019_2020/LiCENSE"
+    val filepath: String = System.getProperty("user.dir") + "/LiCENSE"
 
     val rdd: RDD[String] = sc.textFile(filepath)
 

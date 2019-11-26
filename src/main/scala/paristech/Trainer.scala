@@ -5,10 +5,80 @@ import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.spark.ml.feature._
 import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.ml.tuning.{CrossValidator, CrossValidatorModel, ParamGridBuilder}
+import org.apache.spark.ml.tuning.{ParamGridBuilder, TrainValidationSplit, TrainValidationSplitModel}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object Trainer {
+
+  // Train and test, see usage
+  def main(args: Array[String]): Unit = {
+
+    object Command extends Enumeration {
+      type Command = Value
+      val DEFAULT, TRAIN, TEST = Value
+    }
+
+    var command = Command.DEFAULT
+    var gridSearch = true
+    var inputPath = Context.dataPath + "/prepared_trainingset"
+
+    val spark = Context.createSession()
+
+    // Command line args
+    var i: Int = 0
+    while (i < args.length) {
+      args(i) match {
+        case "--train" => command = Command.TRAIN
+
+        case "--test" => command = Command.TEST
+
+        case "--single-run" => gridSearch = false
+
+        case "--grid-search" => gridSearch = true
+
+        case "--in" => {
+          i += 1
+          inputPath = args(i)
+        }
+
+        case "target.*\\.jar" => {/* ignore */}
+
+        case _ => {
+          print("Unknown argument " + args(i) + "\n")
+          print("Usage: --train|--test --single-run|--grid-search\n")
+        }
+      }
+      i += 1
+    }
+
+    command match {
+      case Command.TRAIN => {
+        val Array(dfTrain, dfTest) = splitData(spark, inputPath, saveTestData = true)
+
+        print("\n=== Starting Model fitting ===\n\n")
+        fitModel(dfTrain, saveModels = true, gridSearch)
+      }
+      case Command.TEST => {
+        // Read data
+        val dfTest: DataFrame = spark.read.parquet(Context.outputPath + "/test/test_df")
+
+        // And load it back in during production
+        val model = TrainValidationSplitModel.load(Context.outputPath + "/models/spark-logistic-regression-model")
+
+        print("\n=== Starting Testing ===\n\n")
+        test(model, dfTest)
+      }
+      case _ => {
+        // Default : do Train and Test
+        val Array(dfTrain, dfTest) = splitData(spark, inputPath, saveTestData = false)
+
+        print("\n=== Starting Model fitting ===\n\n")
+        val model = fitModel(dfTrain, saveModels = false, gridSearch)
+        print("\n=== Starting Model testing ===\n\n")
+        test(model, dfTest)
+      }
+    }
+  }
 
   // Make pipeline (word TF-IDF, categories, label encoders) + logistic regression
   // Also creating the grid search on the min term frequency (minDF) and the regularization parameter
@@ -24,7 +94,6 @@ object Trainer {
       .setInputCol("text")
       .setOutputCol("tokens")
 
-
     val stopWordRemover = new StopWordsRemover()
       .setCaseSensitive(false)
       .setLocale("en")
@@ -39,7 +108,6 @@ object Trainer {
     // Handling of categorical columns
     // 1. Encode labels with StringIndexer
     // 2. One-hot encoding
-
     val countryIndexer = new StringIndexer()
       .setHandleInvalid("keep") // To handle labels that are not in training but are in test
       .setInputCol("country2")
@@ -55,10 +123,14 @@ object Trainer {
       .setOutputCols(Array("country_onehot", "currency_onehot"))
 
     // Eventually assemble all feature columns into a single column
-    val assembler = new VectorAssembler()
-      .setInputCols(Array("tfidf", "days_campaign", "hours_prepa", "goal", "country_onehot", "currency_onehot"))
+    //
+    val assemblerFinal = new VectorAssembler()
+      .setInputCols(Array("days_campaign", "hours_prepa", "goal", "tfidf", "country_onehot", "currency_onehot"))
       .setOutputCol("features")
+      .setHandleInvalid("skip")
 
+    // Regression model
+    //
     val lr = new LogisticRegression()
       .setElasticNetParam(0.0)
       .setFitIntercept(true)
@@ -70,11 +142,17 @@ object Trainer {
       .setThresholds(Array(0.7, 0.3))
       .setTol(1.0e-6)
       .setRegParam(0.0001)
+      .setElasticNetParam(0.5)
       .setMaxIter(20)
+      // Added
+      //.setWeightCol("label_weights")
 
-    val pipeline = new  Pipeline()
-      .setStages(Array(tokenizer, stopWordRemover, hashingTF, idf, countryIndexer,
-        currencyIndexer, oneHotEncoder, assembler, lr))
+    // Pipeline assembly
+    val pipeline = new Pipeline()
+      .setStages(Array(tokenizer, stopWordRemover, hashingTF, idf,
+        countryIndexer, currencyIndexer, oneHotEncoder,
+        assemblerFinal,
+        lr))
 
     // Grid search parameters
     val paramGrid = new ParamGridBuilder()
@@ -94,58 +172,74 @@ object Trainer {
 
   // Split cleaned data
   // Return (train, test) data frames
-  def splitData(spark: SparkSession, saveTestData: Boolean): Array[DataFrame] = {
+  def splitData(spark: SparkSession, inputPath : String, saveTestData: Boolean): Array[DataFrame] = {
+
+    /*
+      import spark.implicits._
+
+      // Read preprocessed data
+      val dfPrep: DataFrame = spark.read.parquet(Context.dataPath + "/prepared_trainingset")
+      // Added
+      val df = dfPrep.withColumn("label_weights", $"final_status" * 2 + 1)
+    */
     // Read preprocessed data
-    val df: DataFrame = spark.read.parquet(Context.dataPath + "/prepared_trainingset")
+    val df: DataFrame = spark.read.parquet(inputPath)
 
     // Split train / test with random seed
     val Array(dfTrain, dfTest) = df.randomSplit(Array(0.9, 0.1))
 
     // Save test data
     if (saveTestData) {
-      dfTest.write.mode(SaveMode.Overwrite).parquet(Context.dataPath + "/test_df")
+      dfTest.write.mode(SaveMode.Overwrite).parquet(Context.outputPath + "/test_df")
     }
 
     Array(dfTrain, dfTest)
   }
 
   // Train
-  def fitModel(dfTrain: DataFrame, saveModels: Boolean, gridSearch: Boolean): CrossValidatorModel = {
+  def fitModel(dfTrain: DataFrame, saveModels: Boolean, gridSearch: Boolean): TrainValidationSplitModel = {
 
     // Make pipeline
     val (pipeline, gridParams) = buildPipeline(gridSearch)
 
     // Save unfit pipeline to disk
     if (saveModels) {
-      pipeline.write.overwrite().save(Context.dataPath + "/model0-unfit")
+      pipeline.write.overwrite().save(Context.outputPath + "/model0-unfit")
     }
+
+    printf("  Hyper param search grid size : %d\n", gridParams.length)
 
     // Evaluation of the model based on F1-score
     val evaluator = new MulticlassClassificationEvaluator()
       .setLabelCol("final_status")
       .setPredictionCol("predictions")
+      // Could be Changed to "weightedPrecision"
       .setMetricName("f1")
 
-    val cv = new CrossValidator()
+    // Split the train and validation data
+    // Will actually rerun the gradient descent with full data
+    val validator = new TrainValidationSplit()
       .setEstimator(pipeline)
-      .setEstimatorParamMaps(gridParams)
       .setEvaluator(evaluator)
-      .setNumFolds(3)  // Approx 70/30
-      .setParallelism(2)  // Evaluate up to 2 parameter settings in parallel
+      .setEstimatorParamMaps(gridParams)
+      // 70% of the data will be used for training and the remaining 30% for validation.
+      .setTrainRatio(0.7)
+      // Evaluate up to 2 parameter settings in parallel
+      .setParallelism(2)
 
     // Fit the pipeline to training documents.
-    val model: CrossValidatorModel = cv.fit(dfTrain)
+    val model: TrainValidationSplitModel = validator.fit(dfTrain)
 
     // Save the fitted pipeline to disk
     if (saveModels) {
-      model.write.overwrite().save(Context.dataPath + "/model0-fit")
+      model.write.overwrite().save(Context.outputPath + "/model0-fit")
     }
 
     return model
   }
 
   // Perform predictions and compute F1-score
-  def test(model: CrossValidatorModel, dfTest: DataFrame): Unit = {
+  def test(model: TrainValidationSplitModel, dfTest: DataFrame): Unit = {
 
     // Compute predictions
     val dfWithSimplePredictions = model.transform(dfTest)
@@ -164,62 +258,5 @@ object Trainer {
     println("F1 score = " + evaluator.evaluate(dfWithSimplePredictions))
 
     dfWithSimplePredictions.unpersist()
-  }
-
-  // Tester : read model as saved,
-  def main(args: Array[String]): Unit = {
-
-    object Command extends Enumeration {
-      type Command = Value
-      val DEFAULT, TRAIN, TEST = Value
-    }
-
-    var command = Command.DEFAULT
-    var gridSearch = true
-
-    val spark = Context.createSession()
-
-    // Command line args
-    args.foreach( arg => {
-      arg match {
-        case "--train" => command = Command.TRAIN
-
-        case "--test" => command = Command.TEST
-
-        case "--single-run" => gridSearch = false
-
-        case _ => {
-            print("Usage: --train|--test --single-run")
-        }
-      }
-    })
-
-    command match {
-      case Command.TRAIN => {
-        val Array(dfTrain, dfTest) = splitData(spark, saveTestData = true)
-
-        print("\n=== Starting Model fitting ===\n\n")
-        fitModel(dfTrain, saveModels = true, gridSearch)
-      }
-      case Command.TEST => {
-        // Read data
-        val dfTest: DataFrame = spark.read.parquet(Context.dataPath + "/test/test_df")
-
-        // And load it back in during production
-        val model = CrossValidatorModel.load(Context.dataPath + "/models/spark-logistic-regression-model")
-
-        print("\n=== Starting Testing ===\n\n")
-        test(model, dfTest)
-      }
-      case _ => {
-        // Default : do Train and Test
-        val Array(dfTrain, dfTest) = splitData(spark, saveTestData = false)
-
-        print("\n=== Starting Model fitting ===\n\n")
-        val model = fitModel(dfTrain, saveModels = false, gridSearch)
-        print("\n=== Starting Model testing ===\n\n")
-        test(model, dfTest)
-      }
-    }
   }
 }

@@ -6,8 +6,12 @@ import org.apache.spark.sql.SparkSession
 
 object Context {
 
-  // Path to data, assuming that the cours-spark-telecom is side by side with the project
-  val dataPath = System.getProperty("user.dir") + "/../cours-spark-telecom/data/"
+  // Path to data
+  val dataPath = System.getProperty("user.dir") + "/data"
+  // Following was : assuming that the cours-spark-telecom is side by side with the project
+    // System.getProperty("user.dir") + "/../cours-spark-telecom/data/"
+
+  val outputPath = System.getProperty("user.dir") + "/output"
 
   // Create and config a Spark session
   def createSession(): SparkSession = {
@@ -26,11 +30,12 @@ object Context {
 
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("akka").setLevel(Level.WARN)
+    Logger.getLogger("io.netty").setLevel(Level.WARN)
 
     val sparkSession = SparkSession
       .builder
       .config(conf)
-      .master("local[4]")
+      .master("local[5]")
       .appName("TP Spark : Trainer")
       .getOrCreate()
 
