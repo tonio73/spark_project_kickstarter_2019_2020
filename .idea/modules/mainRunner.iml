@@ -18,6 +18,18 @@
           <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.avro/avro-mapred/srcs/avro-mapred-1.8.2-sources.jar!/" />
           <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.orc/orc-core/srcs/orc-core-1.5.5-sources.jar!/" />
           <root url="jar://$USER_HOME$/.ivy2/cache/org.apache.orc/orc-mapreduce/srcs/orc-mapreduce-1.5.5-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_ref-linux-armhf/srcs/netlib-native_ref-linux-armhf-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_ref-linux-i686/srcs/netlib-native_ref-linux-i686-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_ref-linux-x86_64/srcs/netlib-native_ref-linux-x86_64-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_ref-osx-x86_64/srcs/netlib-native_ref-osx-x86_64-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_ref-win-i686/srcs/netlib-native_ref-win-i686-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_ref-win-x86_64/srcs/netlib-native_ref-win-x86_64-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_system-linux-armhf/srcs/netlib-native_system-linux-armhf-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_system-linux-i686/srcs/netlib-native_system-linux-i686-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_system-linux-x86_64/srcs/netlib-native_system-linux-x86_64-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_system-osx-x86_64/srcs/netlib-native_system-osx-x86_64-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_system-win-i686/srcs/netlib-native_system-win-i686-1.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.ivy2/cache/com.github.fommil.netlib/netlib-native_system-win-x86_64/srcs/netlib-native_system-win-x86_64-1.1-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
@@ -193,5 +205,20 @@
     <orderEntry type="library" name="sbt: com.chuusai:shapeless_2.11:2.3.2:jar" level="project" />
     <orderEntry type="library" name="sbt: com.carrotsearch:hppc:0.7.2:jar" level="project" />
     <orderEntry type="library" name="sbt: aopalliance:aopalliance:1.0:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil:jniloader:1.1:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:native_ref-java:1.1:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:native_system-java:1.1:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_ref-linux-armhf:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_ref-linux-i686:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_ref-linux-x86_64:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_ref-osx-x86_64:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_ref-win-i686:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_ref-win-x86_64:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_system-linux-armhf:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_system-linux-i686:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_system-linux-x86_64:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_system-osx-x86_64:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_system-win-i686:1.1:natives:jar" level="project" />
+    <orderEntry type="library" name="sbt: com.github.fommil.netlib:netlib-native_system-win-x86_64:1.1:natives:jar" level="project" />
   </component>
 </module>
