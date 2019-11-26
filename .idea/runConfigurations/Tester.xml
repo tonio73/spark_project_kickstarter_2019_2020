@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Tester" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="paristech.Trainer" />
+    <module name="mainRunner" />
+    <option name="PROGRAM_PARAMETERS" value="--test" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="paristech.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
