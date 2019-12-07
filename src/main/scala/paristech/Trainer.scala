@@ -101,7 +101,8 @@ object Trainer {
       .setOutputCol("cleanedTokens")
 
     val hashingTF = new HashingTF()
-      .setInputCol("cleanedTokens").setOutputCol("textTf").setNumFeatures(0x100000)
+      .setInputCol("cleanedTokens").setOutputCol("textTf")
+    //.setNumFeatures(0x100000)
 
     val idf = new IDF().setInputCol("textTf").setOutputCol("tfidf")
 
